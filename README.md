@@ -62,7 +62,7 @@ createResp, err := client.User.CreateUser(createReq)
 ### Daemons
 
 ```go
-addReq := &mcsmapi.AddDaemonRequest{IP: "127.0.0.1", Port: 24444, APIKey: "daemon-key"}
+addReq := &mcsmapi.AddDaemonRequest{IP: "127.0.0.1", Port: 24444, AccessKey: "daemon-key"}
 resp, err := client.Daemon.Add(addReq)
 ```
 
