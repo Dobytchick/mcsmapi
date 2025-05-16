@@ -71,3 +71,8 @@ resp, err := client.Daemon.Add(addReq)
 ```go
 listReq := &mcsmapi.ListInstancesQuery{DaemonID: "daemon-uuid", Page: 1, PageSize: 10}
 instances, err
+```
+
+## More Examples
+
+More usage examples can be found [here](https://github.com/Dobytchick/mcsmapi/tree/main/examples).

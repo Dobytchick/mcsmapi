@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-// userClient реализует методы работы с пользователями через endpoint "auth".
+// userClient implements methods for working with users via the "auth" endpoint.
 type userClient MethodClient
 
 func newUserClient(client *Client) *userClient {
@@ -29,7 +29,7 @@ func (uc *userClient) doRequestAndDecode(method, endpoint string, body, out any)
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// GetList получает список пользователей по параметрам поиска.
+// GetList retrieves a list of users based on search parameters.
 // GET /auth/search?...
 func (uc *userClient) GetList(params *UserQueryParams) (*UserListResponse, error) {
 	var res UserListResponse
@@ -37,7 +37,7 @@ func (uc *userClient) GetList(params *UserQueryParams) (*UserListResponse, error
 	return &res, err
 }
 
-// CreateUser создает нового пользователя.
+// CreateUser creates a new user.
 // POST /auth
 func (uc *userClient) CreateUser(req *CreateUserRequest) (*CreateUserResponse, error) {
 	var res CreateUserResponse
@@ -45,7 +45,7 @@ func (uc *userClient) CreateUser(req *CreateUserRequest) (*CreateUserResponse, e
 	return &res, err
 }
 
-// UpdateUser обновляет данные пользователя по uuid.
+// UpdateUser updates user data by uuid.
 // PUT /auth
 type UpdateUserRequest struct {
 	UUID   string   `json:"uuid"`
@@ -58,7 +58,7 @@ func (uc *userClient) UpdateUser(req *UpdateUserRequest) (*BaseSuccessResponse, 
 	return &res, err
 }
 
-// DeleteUsers удаляет пользователей по списку uuid.
+// DeleteUsers deletes users by a list of uuids.
 // DELETE /auth
 func (uc *userClient) DeleteUsers(uuids []string) (*BaseSuccessResponse, error) {
 	var res BaseSuccessResponse
