@@ -1,4 +1,4 @@
-# MCSManager API Go SDK
+# MCSManager API Go SDK.
 
 **MCSManager API Go SDK** is a client library for Go that provides convenient access to the [MCSManager](https://github.com/MCSManager/MCSManager) API (a panel for managing Minecraft and other servers). The SDK covers all major entities of the panel: users, daemons, instances, files, dashboard, and more.
 
