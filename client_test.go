@@ -244,9 +244,13 @@ func TestSendCommandUsesCommandRoute(t *testing.T) {
 		_, _ = w.Write([]byte(`{"status":200,"data":true}`))
 	}))
 	defer srv.Close()
-	resp, err := NewClient("secret", srv.URL, nil).Instance.SendCommand("instance", "daemon", "say hello & goodbye")
+	resp, err := NewClient("secret", srv.URL, nil).Instance.SendCommandResult("instance", "daemon", "say hello & goodbye")
 	if err != nil || !resp.Data {
 		t.Fatalf("SendCommand = %+v, %v", resp, err)
+	}
+	legacy, err := NewClient("secret", srv.URL, nil).Instance.SendCommand("instance", "daemon", "say hello & goodbye")
+	if err != nil || legacy.Data.InstanceUUID != "instance" {
+		t.Fatalf("legacy SendCommand = %+v, %v", legacy, err)
 	}
 }
 
@@ -279,7 +283,11 @@ func TestFileUpdateAndUploadRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(paths) != 2 || paths[0] != "/api/files/" || paths[1] != "/api/files/upload" {
+	_, err = client.File.Upload(&UploadFileRequest{BaseRequest: BaseRequest{DaemonID: "daemon", UUID: "instance"}, FileName: "/world"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 3 || paths[0] != "/api/files/" || paths[1] != "/api/files/upload" || paths[2] != "/api/files/upload" {
 		t.Fatalf("paths = %v", paths)
 	}
 }
@@ -296,9 +304,16 @@ func TestUnzipUsesStringDestination(t *testing.T) {
 		_, _ = w.Write([]byte(`{"status":200,"data":true}`))
 	}))
 	defer srv.Close()
-	_, err := NewClient("secret", srv.URL, nil).File.Unzip(&UnzipFile{
+	_, err := NewClient("secret", srv.URL, nil).File.UnzipTo(&UnzipFile{
 		Target:   &ZipFileRequest{BaseRequest: BaseRequest{DaemonID: "daemon", UUID: "instance"}},
 		FileData: &UnzipFileRequestBody{Type: CompressModeUnzip, Code: "utf-8", Source: "/backup.zip", Targets: "/restore"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = NewClient("secret", srv.URL, nil).File.Unzip(&CompressFile{
+		Target:   &ZipFileRequest{BaseRequest: BaseRequest{DaemonID: "daemon", UUID: "instance"}},
+		FileData: &ZipFileRequestBody{Type: CompressModeTar, Code: "utf-8", Source: "/backup.zip", Targets: []string{"/restore"}},
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -3,12 +3,13 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/Dobytchick/mcsmapi"
 )
 
 func main() {
-	client := mcsmapi.NewClient("f73e2cd549d447d29f21dcbcbd9a63fb", "http://localhost:23333", nil)
+	client := mcsmapi.NewClient(os.Getenv("MCSM_API_KEY"), "http://localhost:23333", nil)
 	page := 0
 	pageSize := 50 // or 100, depending on your server's max page size
 	var allUsers []mcsmapi.UserData

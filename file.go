@@ -8,8 +8,10 @@ type FileType int
 const (
 	CompressModeZip   CompressMode = 1
 	CompressModeUnzip CompressMode = 2
-	FileTypeFolder    FileType     = 0
-	FileTypeFile      FileType     = 1
+	// CompressModeTar is kept for source compatibility; mode 2 means unzip.
+	CompressModeTar CompressMode = CompressModeUnzip
+	FileTypeFolder  FileType     = 0
+	FileTypeFile    FileType     = 1
 )
 
 type TargetedFile struct {

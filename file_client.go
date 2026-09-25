@@ -80,8 +80,25 @@ func (fc *fileClient) CreateZIPArchive(req *CompressFile) (*ZipFileResponse, err
 	return &res, err
 }
 
-// Unzip extracts files from a ZIP archive.
-func (fc *fileClient) Unzip(req *UnzipFile) (*UnzipFileResponse, error) {
+// Unzip extracts an archive using the legacy request type. Targets must contain
+// exactly one destination directory.
+func (fc *fileClient) Unzip(req *CompressFile) (*UnzipFileResponse, error) {
+	if req == nil || req.FileData == nil || len(req.FileData.Targets) != 1 {
+		return nil, fmt.Errorf("unzip requires one destination directory")
+	}
+	return fc.UnzipTo(&UnzipFile{
+		Target: req.Target,
+		FileData: &UnzipFileRequestBody{
+			Type:    CompressModeUnzip,
+			Code:    req.FileData.Code,
+			Source:  req.FileData.Source,
+			Targets: req.FileData.Targets[0],
+		},
+	})
+}
+
+// UnzipTo extracts an archive into the specified directory.
+func (fc *fileClient) UnzipTo(req *UnzipFile) (*UnzipFileResponse, error) {
 	var res UnzipFileResponse
 	err := fc.doRequestAndDecode("POST", "compress?"+req.Target.BuildQueryString(), req.FileData, &res)
 	return &res, err

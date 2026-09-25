@@ -84,8 +84,20 @@ func (ic *instanceClient) Kill(instanceID, daemonID string) (*KillInstanceRespon
 	return &res, err
 }
 
-// SendCommand sends a command to a running instance.
-func (ic *instanceClient) SendCommand(instanceID, daemonID, command string) (*BaseSuccessResponse, error) {
+// SendCommand sends a command and preserves the original response type for
+// existing callers. Use SendCommandResult to inspect the API's boolean result.
+func (ic *instanceClient) SendCommand(instanceID, daemonID, command string) (*KillInstanceResponse, error) {
+	result, err := ic.SendCommandResult(instanceID, daemonID, command)
+	if err != nil {
+		return nil, err
+	}
+	response := &KillInstanceResponse{Status: result.Status, Time: result.Time}
+	response.Data.InstanceUUID = instanceID
+	return response, nil
+}
+
+// SendCommandResult sends a command and returns the API's boolean result.
+func (ic *instanceClient) SendCommandResult(instanceID, daemonID, command string) (*BaseSuccessResponse, error) {
 	var res BaseSuccessResponse
 	params := url.Values{"uuid": {instanceID}, "daemonId": {daemonID}, "command": {command}}
 	endpoint := "protected_instance/command?" + params.Encode()

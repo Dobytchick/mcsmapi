@@ -55,7 +55,7 @@ func main() {
 ### Example: send a command
 
 ```go
-result, err := client.Instance.SendCommand("instance-uuid", "daemon-uuid", "say Hello from Go")
+result, err := client.Instance.SendCommandResult("instance-uuid", "daemon-uuid", "say Hello from Go")
 if err != nil {
     log.Fatal(err)
 }
@@ -66,7 +66,7 @@ fmt.Println(result.Data)
 
 `File.Download` and `File.Upload` request one-time transfer credentials from the panel. The actual download or multipart upload takes place against the daemon address returned by the API. See the [MCSManager file API](https://docs.mcsmanager.com/apis/api_fileManager.html) for that second step.
 
-Browse [runnable examples](examples/) and the [Go package reference](https://pkg.go.dev/github.com/Dobytchick/mcsmapi) for request and response types.
+Browse the [usage guide](docs/USAGE.md), [runnable examples](examples/), and the [Go package reference](https://pkg.go.dev/github.com/Dobytchick/mcsmapi) for request and response types.
 
 ## Development
 
@@ -75,7 +75,7 @@ go test ./...
 go vet ./...
 ```
 
-Each example has its own directory and can be run with `go run ./examples/<name>` after replacing its placeholder credentials and IDs.
+Each example has its own directory and can be run with `go run ./examples/<name>` after setting `MCSM_API_KEY` and replacing placeholder IDs.
 
 ## License
 
