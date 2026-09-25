@@ -29,10 +29,19 @@ func (q *DownloadFileRequest) BuildQueryString() string {
 	return BuildQueryString(q)
 }
 
-type UploadFileRequest DownloadFileRequest
+type UploadFileRequest struct {
+	BaseRequest
+	UploadDir string `url:"upload_dir"`
+	// FileName is a legacy alias for UploadDir.
+	FileName string `url:"-"`
+}
 
 func (q *UploadFileRequest) BuildQueryString() string {
-	return BuildQueryString(q)
+	params := *q
+	if params.UploadDir == "" {
+		params.UploadDir = params.FileName
+	}
+	return BuildQueryString(params)
 }
 
 type CopyFileRequest struct {

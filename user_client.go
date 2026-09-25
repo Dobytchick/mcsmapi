@@ -1,9 +1,6 @@
 package mcsmapi
 
-import (
-	"encoding/json"
-	"net/http"
-)
+import "net/http"
 
 // userClient implements methods for working with users via the "auth" endpoint.
 type userClient MethodClient
@@ -21,12 +18,11 @@ func (uc *userClient) sendRequest(method, endpoint string, body any) (*http.Resp
 }
 
 func (uc *userClient) doRequestAndDecode(method, endpoint string, body, out any) error {
-	resp, err := uc.sendRequest(method, endpoint, body)
-	if err != nil {
-		return err
+	fullEndpoint := uc.endpoint
+	if endpoint != "" {
+		fullEndpoint += "/" + endpoint
 	}
-	defer resp.Body.Close()
-	return json.NewDecoder(resp.Body).Decode(out)
+	return uc.client.doRequestAndDecode(method, fullEndpoint, body, out)
 }
 
 // GetList retrieves a list of users based on search parameters.

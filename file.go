@@ -6,10 +6,12 @@ type CompressMode int
 type FileType int
 
 const (
-	CompressModeZip CompressMode = 1
-	CompressModeTar CompressMode = 2
-	FileTypeFile    FileType     = 0
-	FileTypeFolder  FileType     = 1
+	CompressModeZip   CompressMode = 1
+	CompressModeUnzip CompressMode = 2
+	// CompressModeTar is kept for source compatibility; mode 2 means unzip.
+	CompressModeTar CompressMode = CompressModeUnzip
+	FileTypeFolder  FileType     = 0
+	FileTypeFile    FileType     = 1
 )
 
 type TargetedFile struct {
@@ -71,6 +73,18 @@ type CompressFile struct {
 	FileData *ZipFileRequestBody
 }
 
+type UnzipFileRequestBody struct {
+	Type    CompressMode `json:"type"`
+	Code    string       `json:"code"`
+	Source  string       `json:"source"`
+	Targets string       `json:"targets"`
+}
+
+type UnzipFile struct {
+	Target   *ZipFileRequest
+	FileData *UnzipFileRequestBody
+}
+
 type DeleteFileRequestBody FileTargets
 
 type DeleteFile struct {
@@ -99,9 +113,9 @@ type GetFileListResponse struct {
 	Data   struct {
 		Items        []*FileItem `json:"items"`
 		Page         int         `json:"page"`
-		PageSize     int         `json:"page_size"`
+		PageSize     int         `json:"pageSize"`
 		Total        int         `json:"total"`
-		AbsolutePath string      `json:"absolute_path"`
+		AbsolutePath string      `json:"absolutePath"`
 	} `json:"data"`
 	Time int64 `json:"time"`
 }
