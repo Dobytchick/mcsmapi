@@ -2,7 +2,9 @@ package mcsmapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -106,7 +108,7 @@ func TestClient_createRequest_WithQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(req.URL.String(), "/api/test?x=1&apikey=token") {
+	if req.URL.Path != "/api/test" || req.URL.Query().Get("x") != "1" || req.URL.Query().Get("apikey") != "token" {
 		t.Errorf("unexpected url: %s", req.URL.String())
 	}
 }
@@ -154,7 +156,7 @@ func TestClient_doRequestAndDecode(t *testing.T) {
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"msg":"hello"}`))
+		w.Write([]byte(`{"status":200,"msg":"hello"}`))
 	}))
 	defer srv.Close()
 	client := NewClient("token", srv.URL, nil)
@@ -187,5 +189,118 @@ func TestClient_doRequestAndDecode_RequestError(t *testing.T) {
 	err := client.doRequestAndDecode(http.MethodGet, "/test", nil, &out)
 	if err == nil || !strings.Contains(err.Error(), "request failed") {
 		t.Errorf("expected request failed error, got %v", err)
+	}
+}
+
+func TestClientRejectsAPIAndHTTPFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		code int
+		body string
+		want string
+	}{
+		{"API failure", http.StatusOK, `{"status":403,"data":false}`, "API status 403"},
+		{"HTTP failure", http.StatusForbidden, `{"status":403}`, "HTTP status 403"},
+		{"missing API status", http.StatusOK, `{"data":true}`, "API status 0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.code)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer srv.Close()
+			var out BaseResponse
+			err := NewClient("secret", srv.URL, nil).doRequestAndDecode(http.MethodGet, "test", nil, &out)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("got %v, want %s", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestTransportErrorPreservesCauseWithoutExposingKey(t *testing.T) {
+	client := NewClient("secret+key", "http://localhost", &http.Client{Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		return nil, context.Canceled
+	})})
+	var out BaseResponse
+	err := client.doRequestAndDecode(http.MethodGet, "test", nil, &out)
+	if !errors.Is(err, context.Canceled) || strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "secret%2Bkey") {
+		t.Fatalf("unexpected transport error: %v", err)
+	}
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) { return fn(req) }
+
+func TestSendCommandUsesCommandRoute(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/protected_instance/command" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("command"); got != "say hello & goodbye" {
+			t.Errorf("command = %q", got)
+		}
+		_, _ = w.Write([]byte(`{"status":200,"data":true}`))
+	}))
+	defer srv.Close()
+	resp, err := NewClient("secret", srv.URL, nil).Instance.SendCommand("instance", "daemon", "say hello & goodbye")
+	if err != nil || !resp.Data {
+		t.Fatalf("SendCommand = %+v, %v", resp, err)
+	}
+}
+
+func TestFileUpdateAndUploadRoutes(t *testing.T) {
+	paths := []string{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if r.URL.Query().Get("daemonId") != "daemon" || r.URL.Query().Get("uuid") != "instance" {
+			t.Errorf("missing file target query: %s", r.URL.RawQuery)
+		}
+		if r.URL.Path == "/api/files/upload" && r.URL.Query().Get("upload_dir") != "/world" {
+			t.Errorf("upload_dir = %q", r.URL.Query().Get("upload_dir"))
+		}
+		if r.URL.Path == "/api/files/upload" {
+			_, _ = w.Write([]byte(`{"status":200,"data":{"password":"pass","addr":"localhost"}}`))
+		} else {
+			_, _ = w.Write([]byte(`{"status":200,"data":true}`))
+		}
+	}))
+	defer srv.Close()
+	client := NewClient("secret", srv.URL, nil)
+	_, err := client.File.Update(&UpdateFile{
+		Target:   &UpdateFileRequest{DaemonID: "daemon", UUID: "instance"},
+		FileData: &UpdateFileRequestBody{Target: "/eula.txt", Text: "eula=true"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.File.Upload(&UploadFileRequest{BaseRequest: BaseRequest{DaemonID: "daemon", UUID: "instance"}, UploadDir: "/world"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 2 || paths[0] != "/api/files/" || paths[1] != "/api/files/upload" {
+		t.Fatalf("paths = %v", paths)
+	}
+}
+
+func TestUnzipUsesStringDestination(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if r.URL.Path != "/api/files/compress" || body["targets"] != "/restore" || body["type"] != float64(2) {
+			t.Errorf("unzip request: path=%q body=%v", r.URL.Path, body)
+		}
+		_, _ = w.Write([]byte(`{"status":200,"data":true}`))
+	}))
+	defer srv.Close()
+	_, err := NewClient("secret", srv.URL, nil).File.Unzip(&UnzipFile{
+		Target:   &ZipFileRequest{BaseRequest: BaseRequest{DaemonID: "daemon", UUID: "instance"}},
+		FileData: &UnzipFileRequestBody{Type: CompressModeUnzip, Code: "utf-8", Source: "/backup.zip", Targets: "/restore"},
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

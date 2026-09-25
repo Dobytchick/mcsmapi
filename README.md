@@ -1,79 +1,82 @@
-# MCSManager API Go SDK.
+# mcsmapi
 
-**MCSManager API Go SDK** is a client library for Go that provides convenient access to the [MCSManager](https://github.com/MCSManager/MCSManager) API (a panel for managing Minecraft and other servers). The SDK covers all major entities of the panel: users, daemons, instances, files, dashboard, and more.
+[![Go CI](https://github.com/Dobytchick/mcsmapi/actions/workflows/ci.yml/badge.svg)](https://github.com/Dobytchick/mcsmapi/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Dobytchick/mcsmapi.svg)](https://pkg.go.dev/github.com/Dobytchick/mcsmapi)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-## Features
+A Go client for the [MCSManager](https://github.com/MCSManager/MCSManager) panel API. Manage users, daemons, instances, files, Docker images, and dashboard data from Go.
 
-- User management (create, update, delete, search)
-- Daemon management (add, remove, connect)
-- Instance management (create, start, stop, delete, send commands)
-- File operations (list, read, write, copy, delete, archive)
-- Retrieve panel and daemon information
-- Flexible query parameter handling via Go structs and interfaces
-- Fully typed request and response structures
+## Install
 
-## Installation
+Requires Go 1.23.4 or newer.
 
 ```sh
-go get -u github.com/Dobytchick/mcsmapi
+go get github.com/Dobytchick/mcsmapi
 ```
 
-## Quick Start
+## Quick start
+
+Create an API key in MCSManager, then set `MCSM_API_KEY` in your environment. Use HTTPS when connecting to a remote panel: the MCSManager API sends the key as a query parameter.
 
 ```go
 package main
 
 import (
     "fmt"
+    "log"
+    "os"
+
     "github.com/Dobytchick/mcsmapi"
 )
 
 func main() {
-    client := mcsmapi.NewClient("your-api-key", "http://localhost:23333", nil)
-
-    // Get user list
-    params := &mcsmapi.UserQueryParams{Page: 1, PageSize: 10}
-    users, err := client.User.GetList(params)
+    client := mcsmapi.NewClient(os.Getenv("MCSM_API_KEY"), "http://localhost:23333", nil)
+    users, err := client.User.GetList(&mcsmapi.UserQueryParams{Page: 1, PageSize: 10})
     if err != nil {
-        panic(err)
+        log.Fatal(err)
     }
-    fmt.Printf("Users: %+v\n", users)
+    fmt.Printf("%+v\n", users.Data)
 }
 ```
 
-## Usage Examples
+`NewClient` accepts an optional `*http.Client`; passing `nil` uses a client with a 10-second timeout. API and HTTP failures are returned as errors.
 
-### Users
+## API areas
+
+| Client | Typical operations |
+| --- | --- |
+| `client.User` | Search, create, update, and delete users |
+| `client.Daemon` | Add, remove, and connect daemons |
+| `client.Instance` | List, create, control, and send commands to instances |
+| `client.File` | List, read, update, copy, move, archive, and delete files |
+| `client.Image` | Inspect images, containers, networks, and build progress |
+| `client.Dashboard` | Read the panel overview |
+
+### Example: send a command
 
 ```go
-// Get user list
-params := &mcsmapi.UserQueryParams{Page: 1, PageSize: 20}
-resp, err := client.User.GetList(params)
-
-// Create a user
-createReq := &mcsmapi.CreateUserRequest{
-    Username: "newuser",
-    Password: "securepassword",
-    Permission: 1,
+result, err := client.Instance.SendCommand("instance-uuid", "daemon-uuid", "say Hello from Go")
+if err != nil {
+    log.Fatal(err)
 }
-createResp, err := client.User.CreateUser(createReq)
+fmt.Println(result.Data)
 ```
 
-### Daemons
+### File transfers
 
-```go
-addReq := &mcsmapi.AddDaemonRequest{IP: "127.0.0.1", Port: 24444, AccessKey: "daemon-key"}
-resp, err := client.Daemon.Add(addReq)
+`File.Download` and `File.Upload` request one-time transfer credentials from the panel. The actual download or multipart upload takes place against the daemon address returned by the API. See the [MCSManager file API](https://docs.mcsmanager.com/apis/api_fileManager.html) for that second step.
+
+Browse [runnable examples](examples/) and the [Go package reference](https://pkg.go.dev/github.com/Dobytchick/mcsmapi) for request and response types.
+
+## Development
+
+```sh
+go test ./...
+go vet ./...
 ```
 
-### Instances
+Each example has its own directory and can be run with `go run ./examples/<name>` after replacing its placeholder credentials and IDs.
 
-```go
-listReq := &mcsmapi.ListInstancesQuery{DaemonID: "daemon-uuid", Page: 1, PageSize: 10}
-instances, err
+## License
 
-```
-
-## More Examples
-
-More usage examples can be found [here](https://github.com/Dobytchick/mcsmapi/tree/main/examples).
+[Apache 2.0](LICENSE).

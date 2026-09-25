@@ -1,7 +1,6 @@
 package mcsmapi
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -22,13 +21,7 @@ func (fc *fileClient) sendRequest(method, endpoint string, body any) (*http.Resp
 
 // doRequestAndDecode is a shared utility to decode response JSON into the given output struct.
 func (fc *fileClient) doRequestAndDecode(method, endpoint string, body, out any) error {
-	resp, err := fc.sendRequest(method, endpoint, body)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	return json.NewDecoder(resp.Body).Decode(out)
+	return fc.client.doRequestAndDecode(method, fmt.Sprintf("%s/%s", fc.endpoint, endpoint), body, out)
 }
 
 // GetFileList returns the list of files for the given path/query.
@@ -48,7 +41,7 @@ func (fc *fileClient) GetFileContents(req *FileContents) (*GetFileContentsRespon
 // Update writes or replaces the file content.
 func (fc *fileClient) Update(req *UpdateFile) (*BaseResponse, error) {
 	var res BaseResponse
-	err := fc.doRequestAndDecode("PUT", "", req.FileData, &res)
+	err := fc.doRequestAndDecode("PUT", "?"+BuildQueryString(req.Target), req.FileData, &res)
 	return &res, err
 }
 
@@ -62,7 +55,7 @@ func (fc *fileClient) Download(req *DownloadFileRequest) (*DownloadFileResponse,
 // Upload uploads a file to the target destination.
 func (fc *fileClient) Upload(req *UploadFileRequest) (*UploadFileResponse, error) {
 	var res UploadFileResponse
-	err := fc.doRequestAndDecode("POST", "download?"+req.BuildQueryString(), nil, &res) // ← Might be a typo: "download" vs "upload"
+	err := fc.doRequestAndDecode("POST", "upload?"+req.BuildQueryString(), nil, &res)
 	return &res, err
 }
 
@@ -88,9 +81,9 @@ func (fc *fileClient) CreateZIPArchive(req *CompressFile) (*ZipFileResponse, err
 }
 
 // Unzip extracts files from a ZIP archive.
-func (fc *fileClient) Unzip(req *CompressFile) (*UnzipFileResponse, error) {
+func (fc *fileClient) Unzip(req *UnzipFile) (*UnzipFileResponse, error) {
 	var res UnzipFileResponse
-	err := fc.doRequestAndDecode("POST", "compress?"+req.Target.BuildQueryString(), req.FileData, &res) // ← Might also be "uncompress"?
+	err := fc.doRequestAndDecode("POST", "compress?"+req.Target.BuildQueryString(), req.FileData, &res)
 	return &res, err
 }
 

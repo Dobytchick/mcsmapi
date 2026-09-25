@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -24,6 +25,11 @@ type Client struct {
 }
 
 const HTTPTimeout = 10
+
+type requestError struct{ cause error }
+
+func (e *requestError) Error() string { return "HTTP request failed" }
+func (e *requestError) Unwrap() error { return e.cause }
 
 func NewClient(token string, baseURL string, httpClient *http.Client) *Client {
 	if httpClient == nil {
@@ -49,28 +55,34 @@ func NewClient(token string, baseURL string, httpClient *http.Client) *Client {
 }
 
 func (c *Client) createRequest(endpoint string, body any, method string) (*http.Request, error) {
-	bodyBytes, err := json.Marshal(body)
+	u, err := url.Parse(strings.TrimRight(c.baseURL, "/") + "/api/" + strings.TrimLeft(endpoint, "/"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid request URL: %w", err)
 	}
-
-	sep := "?"
-	if strings.Contains(endpoint, "?") {
-		sep = "&"
+	q := u.Query()
+	q.Set("apikey", c.token)
+	u.RawQuery = q.Encode()
+	var payload *bytes.Reader
+	if body != nil {
+		bodyBytes, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("marshal request: %w", err)
+		}
+		payload = bytes.NewReader(bodyBytes)
+	} else {
+		payload = bytes.NewReader(nil)
 	}
-	apiQuery := sep + "apikey=" + c.token
-
-	fmt.Println(c.baseURL + "/api/" + endpoint + apiQuery)
-
-	req, err := http.NewRequest(method, c.baseURL+"/api/"+endpoint+apiQuery, bytes.NewBuffer(bodyBytes))
-
-	return req, err
+	return http.NewRequest(method, u.String(), payload)
 }
 
 func (c *Client) doRequest(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	return c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, &requestError{cause: err}
+	}
+	return resp, nil
 }
 
 func (c *Client) sendRequest(method, endpoint string, body any) (*http.Response, error) {
@@ -89,9 +101,24 @@ func (c *Client) doRequestAndDecode(method, endpoint string, body, out any) erro
 	}
 	defer resp.Body.Close()
 
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("HTTP status %d", resp.StatusCode)
+	}
+	var envelope struct {
+		Status int `json:"status"`
+	}
+	var raw json.RawMessage
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return fmt.Errorf("decode response failed: %w", err)
 	}
-
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return fmt.Errorf("decode response failed: %w", err)
+	}
+	if envelope.Status != http.StatusOK {
+		return fmt.Errorf("API status %d", envelope.Status)
+	}
+	if err := json.Unmarshal(raw, out); err != nil {
+		return fmt.Errorf("decode response failed: %w", err)
+	}
 	return nil
 }

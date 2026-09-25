@@ -29,7 +29,10 @@ func (q *DownloadFileRequest) BuildQueryString() string {
 	return BuildQueryString(q)
 }
 
-type UploadFileRequest DownloadFileRequest
+type UploadFileRequest struct {
+	BaseRequest
+	UploadDir string `url:"upload_dir"`
+}
 
 func (q *UploadFileRequest) BuildQueryString() string {
 	return BuildQueryString(q)

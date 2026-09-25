@@ -1,9 +1,6 @@
 package mcsmapi
 
-import (
-	"encoding/json"
-	"fmt"
-)
+import "fmt"
 
 type daemonClient MethodClient
 
@@ -44,15 +41,8 @@ func (dc *daemonClient) doJSONRequest(method, endpoint string, body any) (*BaseR
 }
 
 func (dc *daemonClient) doRawRequest(method, endpoint string) (*BaseResponse, error) {
-	resp, err := dc.client.sendRequest(method, dc.endpoint+"/"+endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
 	var result BaseResponse
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	if err != nil {
+	if err := dc.client.doRequestAndDecode(method, dc.endpoint+"/"+endpoint, nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
